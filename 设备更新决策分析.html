@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金蝶数智财务管理实训平台 - 设备更新决策分析</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <style>
+        /* 全局重置与基础 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f5f7fa;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+        a { text-decoration: none; color: inherit; }
+
+        /* 顶部导航栏 */
+        .header {
+            background-color: #2c3e50;
+            padding: 1rem 2rem;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        /* 容器 */
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        /* 仪表盘布局 */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 2rem;
+            background: #fff;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .input-area h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            color: #34495e;
+        }
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            transition: border-color 0.3s;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52,152,219,0.1);
+        }
+
+        /* 结果区 */
+        .result-box {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e1e4e8;
+        }
+        .result-box div {
+            margin-bottom: 0.5rem;
+        }
+        .result-box strong {
+            color: #3498db;
+        }
+
+        /* 图表区 */
+        #resultChart {
+            width: 100%;
+            height: 500px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 1rem;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .dashboard { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部标题 -->
+    <header class="header">
+        <h1>金蝶数智财务管理实训平台</h1>
+    </header>
+
+    <main class="container">
+        <div class="dashboard">
+            <div class="input-area">
+                <h2>设备参数输入</h2>
+                <div class="input-group">
+                    <label for="device_price">设备现价（万元）</label>
+                    <input type="number" id="device_price" value="100" step="10">
+                </div>
+                <div class="input-group">
+                    <label for="annual_rate">年利率（%）</label>
+                    <input type="number" id="annual_rate" value="10" step="1">
+                </div>
+                <div class="input-group">
+                    <label for="A_discount">A方案折扣率（%）</label>
+                    <input type="number" id="A_discount" value="3" step="1">
+                </div>
+                <div class="input-group">
+                    <label for="B_years">B方案付款年数</label>
+                    <input type="number" id="B_years" value="2" step="1">
+                </div>
+                <div class="input-group">
+                    <label for="B_amount">B方案未来支付金额（万元）</label>
+                    <input type="number" id="B_amount" value="200" step="10">
+                </div>
+                <div class="input-group">
+                    <label for="C_years">C方案分期年数</label>
+                    <input type="number" id="C_years" value="4" step="1">
+                </div>
+                <div class="input-group">
+                    <label for="C_annual_pay">C方案年支付金额（万元）</label>
+                    <input type="number" id="C_annual_pay" value="60" step="5">
+                </div>
+                <div class="result-box">
+                    <div>最佳方案: <strong id="bestScheme">-</strong></div>
+                    <div>A方案现值: <span id="pvA">-</span> 万元</div>
+                    <div>B方案现值: <span id="pvB">-</span> 万元</div>
+                    <div>C方案现值: <span id="pvC">-</span> 万元</div>
+                </div>
+            </div>
+            <div id="resultChart"></div>
+        </div>
+    </main>
+
+    <script>
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(input => input.addEventListener('input', updateAnalysis));
+        let myChart = echarts.init(document.getElementById('resultChart'));
+
+        function calculatePresentValues() {
+            const params = {
+                device_price: parseFloat(document.getElementById('device_price').value) || 0,
+                annual_rate: (parseFloat(document.getElementById('annual_rate').value) || 0) / 100,
+                A_discount: (parseFloat(document.getElementById('A_discount').value) || 0) / 100,
+                B_years: parseInt(document.getElementById('B_years').value) || 0,
+                B_amount: parseFloat(document.getElementById('B_amount').value) || 0,
+                C_years: parseInt(document.getElementById('C_years').value) || 0,
+                C_annual_pay: parseFloat(document.getElementById('C_annual_pay').value) || 0
+            };
+
+            const pv_A = params.device_price * (1 - params.A_discount);
+            const pv_B = params.B_amount / Math.pow(1 + params.annual_rate, params.B_years);
+            const annuity_factor = (1 - Math.pow(1 + params.annual_rate, -params.C_years)) / params.annual_rate;
+            const pv_C = params.C_annual_pay * annuity_factor;
+
+            return { A: pv_A.toFixed(2), B: pv_B.toFixed(2), C: pv_C.toFixed(2) };
+        }
+
+        function updateAnalysis() {
+            const results = calculatePresentValues();
+            const values = [results.A, results.B, results.C].map(Number);
+            const minValue = Math.min(...values);
+            const bestScheme = ['A', 'B', 'C'][values.indexOf(minValue)];
+
+            document.getElementById('pvA').textContent = results.A;
+            document.getElementById('pvB').textContent = results.B;
+            document.getElementById('pvC').textContent = results.C;
+            document.getElementById('bestScheme').textContent = bestScheme;
+
+            const option = {
+                title: { text: '付款方案现值对比', left: 'center', textStyle: { color: '#2c3e50', fontSize: 18 } },
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                xAxis: { type: 'category', data: ['A方案', 'B方案', 'C方案'], axisLabel: { color: '#666' } },
+                yAxis: { type: 'value', axisLabel: { color: '#666', formatter: '{value} 万' } },
+                series: [{ type: 'bar', data: values, itemStyle: { color: (params) => params.dataIndex === values.indexOf(minValue) ? '#3498db' : '#95a5a6' }, label: { show: true, position: 'top', formatter: '{c}万', color: '#333' } }]
+            };
+            myChart.setOption(option);
+        }
+        updateAnalysis();
+    </script>
+</body>
+</html>
